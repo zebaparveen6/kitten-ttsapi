@@ -55,4 +55,4 @@ jobs:
             -H "Content-Type: multipart/form-data" \
             -F chat_id="$CHAT_ID" \
             -F voice="@tts_output.wav" \
-            "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVoice"
+            "https://api.telegram.org/bot8276916788:AAFqYhxqLjQMtw6BTmFzMf1AyYHWDhDVhtA/sendVoice"
