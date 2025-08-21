@@ -1,0 +1,4 @@
+soundfile==0.12.1
+requests==2.31.0
+# KittenTTS wheel — either the release or install from git if wheel not available
+git+https://github.com/KittenML/KittenTTS.git@main
