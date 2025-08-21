@@ -1,4 +1,4 @@
-name: TTS via repository_dispatch
+name: TTS via repository_dispatch (Cached Efficient)
 
 on:
   repository_dispatch:
@@ -15,23 +15,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Setup Python with pip caching
-      - name: Setup Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip'  # enables pip dependency cache
 
-      - name: Show received payload (for debugging)
+      - name: Cache pip cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-cache-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-cache-
+
+      - name: Install Python dependencies
         run: |
-          echo "Received event payload:"
+          pip install soundfile
+          pip install https://github.com/KittenML/KittenTTS/releases/download/0.1/kittentts-0.1.0-py3-none-any.whl
+          pip install requests
+
+      - name: Debug: Show received payload
+        run: |
           echo "CHAT_ID: ${{ github.event.client_payload.telegram_chat_id }}"
           echo "ORIGINAL_MSG: ${{ github.event.client_payload.original_message }}"
           echo "VOICE: ${{ github.event.client_payload.voice || 'expr-voice-2-f' }}"
-
-      - name: Install dependencies
-        run: |
-          pip install soundfile requests
 
       - name: Generate TTS audio
         run: |
@@ -47,15 +54,14 @@ jobs:
           m = KittenTTS("KittenML/kitten-tts-nano-0.1")
           audio = m.generate(text, voice=voice)
           sf.write(fname, audio, 24000)
-
-          print(f"Generated file: {fname}")
+          print(f"Done: Created {fname}")
           EOF
         env:
           CHAT_ID: ${{ github.event.client_payload.telegram_chat_id }}
           ORIG_MSG: ${{ github.event.client_payload.original_message }}
           VOICE: ${{ github.event.client_payload.voice }}
 
-      - name: Send voice message to Telegram
+      - name: Send voice to Telegram
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ github.event.client_payload.telegram_chat_id }}
