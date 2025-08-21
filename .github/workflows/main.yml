@@ -1,67 +1,67 @@
-name: TTS via repository_dispatch
+name: Kitten TTS API
 
 on:
   repository_dispatch:
     types: [start_ollama]
 
 jobs:
-  tts_and_respond:
+  run-tts:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
 
     steps:
-      - name: Checkout code
+      # Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Setup Python with pip caching
+      # Setup Python with caching enabled
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'  # enables pip dependency cache
+          python-version: "3.11"
+          cache: "pip"   # <-- Enables pip caching
 
-      - name: Show received payload (for debugging)
-        run: |
-          echo "Received event payload:"
-          echo "CHAT_ID: ${{ github.event.client_payload.telegram_chat_id }}"
-          echo "ORIGINAL_MSG: ${{ github.event.client_payload.original_message }}"
-          echo "VOICE: ${{ github.event.client_payload.voice || 'expr-voice-2-f' }}"
-
+      # If you have requirements.txt (best practice)
       - name: Install dependencies
+        if: hashFiles('**/requirements.txt') != ''
+        run: pip install -r requirements.txt
+
+      # Else, install manually
+      - name: Install KittenTTS
         run: |
-          pip install soundfile requests
+          pip install --upgrade pip
+          pip install kittentts  # if from PyPI
+          # OR if it's local in your repo:
+          # pip install -e .
 
-      - name: Generate TTS audio
+      # Debug to confirm what's installed
+      - name: List installed packages
+        run: pip list
+
+      # Debug: print received dispatch payload
+      - name: Print dispatch payload
+        run: echo "${{ toJson(github.event.client_payload) }}"
+
+      # Run your script
+      - name: Run TTS
         run: |
-          python - << 'EOF'
-          import os, soundfile as sf
-          from kittentts import KittenTTS
+          python - <<'EOF'
+          import sys, json, os
+          import kittentts
 
-          chat_id = os.environ["CHAT_ID"]
-          text = os.environ["ORIG_MSG"]
-          voice = os.environ.get("VOICE", "expr-voice-2-f")
+          payload = json.loads("""${{ toJson(github.event.client_payload) }}""")
+          print("🔎 Payload received:", payload)
 
-          fname = "tts_output.wav"
-          m = KittenTTS("KittenML/kitten-tts-nano-0.1")
-          audio = m.generate(text, voice=voice)
-          sf.write(fname, audio, 24000)
-
-          print(f"Generated file: {fname}")
+          # Example usage
+          text = payload.get("original_message", "Hello from GitHub Actions")
+          tts = kittentts.TTS()
+          tts.speak(text, output="tts_output.wav")
           EOF
-        env:
-          CHAT_ID: ${{ github.event.client_payload.telegram_chat_id }}
-          ORIG_MSG: ${{ github.event.client_payload.original_message }}
-          VOICE: ${{ github.event.client_payload.voice }}
 
-      - name: Send voice message to Telegram
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID: ${{ github.event.client_payload.telegram_chat_id }}
+      # Send to Telegram
+      - name: Send Voice to Telegram
         run: |
           curl -s -X POST \
             -H "Content-Type: multipart/form-data" \
-            -F chat_id="$CHAT_ID" \
+            -F chat_id="${{ github.event.client_payload.telegram_chat_id }}" \
             -F voice="@tts_output.wav" \
-            "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendVoice"
+            "https://api.telegram.org/bot8276916788:AAFqYhxqLjQMtw6BTmFzMf1AyYHWDhDVhtA/sendVoice"
